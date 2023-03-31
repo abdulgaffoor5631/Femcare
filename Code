@@ -1,1 +1,922 @@
+#include <Adafruit_GFX.h> // Hardware-specific library
+#include <MCUFRIEND_kbv.h>
+#include <Elegoo_GFX.h>    // Core graphics library
+
+MCUFRIEND_kbv tft;
+//#include "DHT.h"
+//#define DHTPIN 4  
+//#define DHTTYPE DHT11
+//DHT dht(DHTPIN, DHTTYPE);
+//int hb=0;
+int emg=0;
+int ecg=0;
+int count1=0;
+int flag=0;
+String btrates="";
+String sds="";
+String ecgs="";
+String emgs="";
+int sd=0;
+int flg=0;
+int btrate=0;
+#include <TouchScreen.h>
+
+#include <Fonts/FreeSansBold12pt7b.h>
+
+#include <Fonts/FreeSansBold18pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
+#include <Fonts/FreeSans9pt7b.h>
+
+#include <Fonts/FreeSansBold9pt7b.h>
+#include "Wire.h"
+#include "MAX30100_PulseOximeter.h"
+ 
+#define REPORTING_PERIOD_MS     1000
+ 
+PulseOximeter pox;
+uint32_t tsLastReport = 0;
+ 
+#define DS1307_ADDRESS 0x68
+byte zero = 0x00; //workaround for issue #527
+String m="";
+int count=1;
+
+// Editable Variables
+  bool proDebug = 0;
+
+
+  String graphName = "Time Graph";
+
+  int graphRange = 100;
+  int markSize = 3;
+  
+// Calculate Values
+  const int numberOfMarks = 10;
+  const int originX = 45;
+  const int originY = 200;
+  const int sizeX = 270;
+  const int sizeY = 150;
+  const int deviation = 30;
+  // Global variables
+  int valueBlock[500];
+  int timeBlock[500];
+  int locationBlock[500];
+  int valuePos;
+  int blockPos;
+  int temp;
+  int chk;
+  int boxSize = (sizeX / numberOfMarks);
+  int mark[] = {(boxSize + deviation), ((boxSize * 2) + deviation), ((boxSize * 3) + deviation), ((boxSize * 4) + deviation), ((boxSize * 5) + deviation), ((boxSize * 6) + deviation), ((boxSize * 7) + deviation), ((boxSize * 8) + deviation)};
+
+  const int minorSizeY = (originY + 10);
+  const int minorSizeX = (originX - 10);
+
+  int numberSize = (sizeY / 6);
+  int number[] = {numberSize, (numberSize * 2), (numberSize * 3), (numberSize * 4), (numberSize * 5), (numberSize * 6)};
+
+  int numberValue = (graphRange / 6);
+  int val[] = {graphRange, (numberValue * 5), (numberValue * 4), (numberValue * 3), (numberValue * 2), numberValue};
+
+
+#define BLACK      0x0000
+#define BLUE       0x001F
+#define RED        0xF800
+#define GREEN      0x07E0
+#define CYAN       0x07FF
+#define MAGENTA    0xF81F
+#define YELLOW     0xFFE0
+#define WHITE      0xFFFF
+#define LIGHTGRAY  0xBDF7
+#define DARKGRAY   0x7BEF
+#define ORANGE     0xFBE0      
+#define PINK       0xF81F  
+#define BROWN      0x79E0
+#define OLIVE      0x7BE0
+#define Navy            0x000F      /  0,   0, 128 /
+
+ #define Black           0x0000      /   0,   0,   0 /
+#define Navy            0x000F      /  0,   0, 128 /
+#define DarkGreen       0x03E0      /   0, 128,   0 /
+#define DarkCyan        0x03EF      /   0, 128, 128 /
+#define Maroon          0x7800      / 128,   0,   0 /
+#define Purple          0x780F      / 128,   0, 128 /
+#define Olive           0x7BE0      / 128, 128,   0 /
+#define LightGrey       0xC618      / 192, 192, 192 /
+#define DarkGrey        0x7BEF      / 128, 128, 128 /
+#define Blue            0x001F      /   0,   0, 255 /
+#define Green           0x07E0      /   0, 255,   0 /
+#define Cyan            0x07FF      /   0, 255, 255 /
+#define Red             0xF800      / 255,   0,   0 /
+#define Magenta         0xF81F      / 255,   0, 255 /
+#define Yellow          0xFFE0      / 255, 255,   0 /
+#define White           0xFFFF      / 255, 255, 255 /
+#define Orange          0xFD20      / 255, 165,   0 /
+#define GreenYellow     0xAFE5      / 173, 255,  47 /
+#define Pink            0xF81F
+int tftColours[] = {BLUE, RED, GREEN, CYAN, MAGENTA, YELLOW, WHITE};
+
+//float temp=0;
+float mv=0;
+int cel=0;
+// work in line numbers.  Font height in ht
+int16_t ht = 16, top = 3, line, lines = 15, scroll;
+#define YP A3  // must be an analog pin, use "An" notation!
+#define XM A2  // must be an analog pin, use "An" notation!
+#define YM 9   // can be a digital pin
+#define XP 8   // can be a digital pin
+#define SENSITIVITY 300
+#define MINPRESSURE 50
+#define MAXPRESSURE 1000
+TouchScreen ts = TouchScreen(XP, YP, XM, YM, SENSITIVITY);
+
+  uint16_t graphColor = BLUE;
+  uint16_t pointColor = BLACK;
+  uint16_t lineColor = GREEN;
+   
+void onBeatDetected()
+{
+    Serial.println("Beat!");
+}
+void setup()
+{
+  Serial3.begin(9600);
+   Wire.begin();
+   Serial.begin(9600);
+  Serial.begin(9600);
+ // pinMode(A6,INPUT);
+  //pinMode(A7,INPUT);
+    tft.reset();
+    uint16_t id = tft.readID();
+    tft.begin(id);
+    tft.setRotation(1);     //Landscape, for portrat it is 0
+    tft.fillScreen(BLACK);
+     tft.setFont(&FreeSansBold24pt7b);
+   // pinMode(A5,INPUT);
+  //  dht.setup(10);
+
+   for (int cnt=0; cnt< 10; cnt++) {
+    tft.setCursor(0, 100);
+    tft.setTextColor(getRandomColour());
+    //tft.setFont(&FreeSansBold24pt7b);
+    tft.setTextSize(2);
+    tft.println("Fetal");
+
+    tft.setTextSize(1);
+    tft.setCursor(150, 150);
+    tft.setTextColor(getRandomColour());
+    tft.println("Monitoring");
+
+    tft.setCursor(50, 200);
+    tft.setTextColor(getRandomColour());
+    tft.println("              System");
+  }
+  tft.fillScreen(BLACK);
+//tft.setFont(&FreeSans9pt7b);
+//drawGraph();
+}
+void loop()
+{
+ // tft.setFont(&FreeSans9pt7b);
+ // graph();
+
+// hb = analogRead(A7)/100;
+hb1();
+ ecg = analogRead(A8)/6;
+ emg = analogRead(A9)/4;
+ sd = analogRead(A10)/2;
+ 
+ if(ecg>100)
+ {
+  ecg=100;
+  }
+  if(emg>100)
+ {
+  emg=100;
+  }
+  if(sd>100)
+ {
+  sd=100;
+  }
+
+  
+ Serial3.print("Heart Beat: ");
+ Serial3.print(btrate);
+ Serial3.println(" bpm");
+ 
+ Serial3.print("ECG: ");
+ Serial3.print(ecg);
+ Serial3.println(" ");
+ 
+ Serial3.print("EMG: ");
+ Serial3.print(emg);
+ Serial3.println(" ");
+ 
+ Serial3.print("Breath: ");
+ Serial3.print(sd);
+ Serial3.println(" ");
+ Serial3.println(" ");
+  tft.setCursor(80, 30);
+  tft.setTextColor(LIGHTGRAY);
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setTextSize(1);
+  tft.print("Health Parameters");
+  
+
+  tft.setCursor(100, 100);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("HB: ");
+  tft.print(btrate);
+  tft.print(" bpm");
+
+  
+  tft.setCursor(300, 100);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("ECG: ");
+  tft.print(ecg);
+  tft.print(" ");
+
+  tft.setCursor(100, 150);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("EMG: ");
+  tft.print(emg);
+  tft.print(" ");
+
+  tft.setCursor(300, 150);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("BRE: ");
+  tft.print(sd);
+  tft.print(" ");
+
+  tft.fillRoundRect(100, 180, 80, 40, 3, WHITE);
+  tft.setTextColor(BLUE);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setCursor(108, 200);
+  tft.print("Graph1");
+
+  tft.fillRoundRect(300, 180, 80, 40, 3, WHITE);
+  tft.setTextColor(BLUE);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setCursor(308, 200);
+  tft.print("Graph2");
+
+  tft.fillRoundRect(100, 250, 80, 40, 3, WHITE);
+  tft.setTextColor(BLUE);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setCursor(108, 270);
+  tft.print("Graph3");
+
+  tft.fillRoundRect(300, 250, 80, 40, 3, WHITE);
+  tft.setTextColor(BLUE);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setCursor(308, 270);
+  tft.print("Graph4");
+
+ long int time = millis();
+    while( (time+5000) > millis())
+    {
+   waitOneTouch();
+    }
+   if(flg==1)
+   {
+   
+ tft.fillScreen(WHITE);
+  
+  tft.setFont(&FreeSans9pt7b);
+  drawGraph("Heart Beat");
+  while(flg==1)
+    {
+      graph();
+      waitOneTouch();
+      delay(1000);
+      }
+       tft.fillScreen(BLACK);
+   }
+   else if(flg==2)
+   {
+   
+ tft.fillScreen(WHITE);
+  
+  tft.setFont(&FreeSans9pt7b);
+  drawGraph("ECG");
+  while(flg==2)
+    {
+      graph1();
+      waitOneTouch();
+      delay(1000);
+      }
+       tft.fillScreen(BLACK);
+   }
+   else if(flg==3)
+   {
+   
+ tft.fillScreen(WHITE);
+  
+  tft.setFont(&FreeSans9pt7b);
+  drawGraph("EMG");
+  while(flg==3)
+    {
+      graph2();
+      waitOneTouch();
+      delay(1000);
+      }
+       tft.fillScreen(BLACK);
+   }
+   else if(flg==4)
+   {
+   
+ tft.fillScreen(WHITE);
+  
+  tft.setFont(&FreeSans9pt7b);
+  drawGraph("Breath");
+  while(flg==4)
+    {
+      graph3();
+      waitOneTouch();
+      delay(1000);
+      }
+       tft.fillScreen(BLACK);
+   }
+  tft.fillScreen(BLACK);
+
+if((btrate>100)||(btrate<35))
+{
+  btrates = "ABN";
+  }
+  else
+  {
+  btrates = "NM";
+  }
+
+if(ecg>100)
+{
+  ecgs="ABN";
+  }
+  else
+  {
+    ecgs="NM";
+    }
+    
+if(emg<30)
+{
+  emgs="ABN";
+  }
+  else
+  {
+    emgs="NM";
+    }
+    
+if(sd<10)
+{
+  sds="ABN";
+  }
+  else
+  {
+    sds="NM";
+    }
+  tft.setCursor(80, 30);
+  tft.setTextColor(LIGHTGRAY);
+  tft.setFont(&FreeSansBold18pt7b);
+  tft.setTextSize(1);
+  tft.print("Status Report");
+  
+
+  tft.setCursor(100, 100);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("HB: ");
+  tft.print(btrates);
+
+  
+  tft.setCursor(300, 100);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("ECG: ");
+  tft.print(ecgs);
+  tft.print(" ");
+
+  tft.setCursor(100, 150);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("EMG: ");
+  tft.print(emgs);
+  tft.print(" ");
+
+  tft.setCursor(300, 150);
+  tft.setTextColor(YELLOW);
+  tft.setFont(&FreeSansBold12pt7b);
+  tft.setTextSize(1);
+  tft.print("BRE: ");
+  tft.print(sds);
+  tft.print(" ");
+
+delay(2000);
+tft.fillScreen(BLACK);
+
+//}
+ // tft.fillScreen(BLACK);
+ // delay(500);
+}
+TSPoint waitOneTouch() {
+
+  // Get a touch in the required button area (or anywhere if flag set)
+  TSPoint p;
+   p = ts.getPoint();
+    pinMode(XM, OUTPUT);  // Pins configures again for TFT control
+    pinMode(YP, OUTPUT);
+    if (p.z < MINPRESSURE || p.z > MAXPRESSURE );
+  {
+    
+  Serial.println(p.x);
+Serial.println(p.y);
+if(flg==0)
+  {
+  if((p.x>350)&&(p.x<460)&&(p.y>640)&&(p.y<740))//460 640
+  {
+  //if()
+  {
+   
+flg=1;
+    
+    }
+  
+  }
+else if((p.x>390)&&(p.x<500)&&(p.y>290)&&(p.y<390))//460 640
+  {
+  //if()
+  {
+   
+flg=2;
+    
+    }
+  
+  }
+
+else if((p.x>150)&&(p.x<300)&&(p.y>700)&&(p.y<800))//460 640
+  {
+  //if((p.y>650)&&(p.y<800))
+  {
+   
+flg=3;
+    
+    }
+  
+  }
+  
+else if((p.x>150)&&(p.x<300)&&(p.y>250)&&(p.y<400))//460 640
+  {
+  if((p.y>250)&&(p.y<400))
+  {
+   
+flg=4;
+    
+    }
+  
+  }
+  }
+  else
+  {
+     if((p.x>200)&&(p.x<300))//460 640
+  {
+  if((p.y>300)&&(p.y<450))
+  {
+   
+flg=0;
+    
+    }
+  
+  }
+ 
+    }
+
+  
+
+
+  }
+  
+  // All done, return the touch coordinates object
+  return p;
+}
+
+
+unsigned int getRandomColour() {
+  static unsigned int prevColour = 99;
+  int colour;
+  do {
+    colour = random(0, sizeof tftColours / 2);
+    } while (colour == prevColour);
+
+  prevColour = colour;
+  return tftColours[colour];
+}
+
+
+byte decToBcd(byte val){
+// Convert normal decimal numbers to binary coded decimal
+  return ( (val/10*16) + (val%10) );
+}
+
+byte bcdToDec(byte val)  {
+// Convert binary coded decimal to normal decimal numbers
+  return ( (val/16*10) + (val%16) );
+}
+
+
+
+void drawGraph(String gn)
+{
+  // draw title
+  tft.setCursor(50, 30); // set the cursor
+  tft.setTextColor(BLUE); // set the colour of the text
+  tft.setTextSize(1); // set the size of the text
+  tft.println(gn);
+  
+  // draw outline
+  tft.drawLine(originX, originY, (originX + sizeX), originY, graphColor);
+  tft.drawLine(originX, originY, originX, (originY - sizeY), graphColor);
+
+  // draw lables
+  for(int i = 0; i < numberOfMarks; i++)
+  {
+    tft.drawLine(mark[i], originY, mark[i], minorSizeY, graphColor);
+  }
+
+  // draw numbers
+  for(int i = 0; i < 6; i++)
+  {
+    tft.drawLine(originX, (originY - number[i]), minorSizeX, (originY - number[i]), graphColor);
+  }
+
+  // draw number values
+  for(int i = 0; i < 6; i++)
+  {
+    tft.setCursor((minorSizeX - 30), (number[i] + numberSize));
+    tft.setTextColor(graphColor);
+    tft.setTextSize(1);
+    tft.println(val[i]);
+  }
+  
+  tft.fillRoundRect(300, 250, 80, 40, 3, BLUE);
+  tft.setTextColor(WHITE);
+  tft.setFont(&FreeSansBold9pt7b);
+  tft.setTextSize(1);
+  tft.setCursor(308, 270);
+  tft.print("Back");
+}
+
+void graph()
+{
+  hb();
+
+  timeBlock[valuePos] = ((millis() - 4500) / 1000);
+
+  valueBlock[valuePos] = btrate;
+  
+  if(proDebug)
+  {
+    Serial.println(timeBlock[valuePos]);
+  }
+  
+  if(blockPos < 8)
+  {
+    // print the time
+    tft.setCursor((mark[valuePos] - 5), (originY + 16));
+    tft.setTextColor(graphColor, WHITE);
+    tft.setTextSize(1);
+   //  tft.print(" ");
+   // tft.println(timeBlock[valuePos]);
+    
+    // map the value
+    locationBlock[valuePos] = map(btrate, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point
+    tft.fillRect((mark[valuePos] - 1), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // try connecting to previous point
+    if(valuePos != 0)
+    {
+      tft.drawLine(mark[valuePos], locationBlock[valuePos], mark[(valuePos - 1)], locationBlock[(valuePos - 1)], lineColor);
+    }
+
+    blockPos++;
+  }
+  else
+  {
+    // clear the graph's canvas
+    tft.fillRect((originX + 2), (originY - sizeY), sizeX, sizeY, WHITE);
+
+    // map the value - current point
+    locationBlock[valuePos] = map(btrate, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point - current point
+    tft.fillRect((mark[7]), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // draw all points
+    for(int i = 0; i < 8; i++)
+    {
+      tft.fillRect((mark[(blockPos - (i + 1))] - 1), (locationBlock[(valuePos - i)] - 1), markSize, markSize, pointColor);
+    }
+
+    // draw all the lines
+    for(int i = 0; i < 7; i++)
+    {
+      tft.drawLine(mark[blockPos - (i + 1)], locationBlock[valuePos - i], mark[blockPos - (i + 2)], locationBlock[valuePos - (i + 1)], lineColor);
+    }
+    
+    // change time lables
+    for(int i = 0; i <= 7; i++)
+    {
+      tft.setCursor((mark[(7 - i)] - 5), (originY + 16));
+      tft.setTextColor(graphColor, WHITE);
+      tft.setTextSize(1);
+     // tft.print(" ");
+     // tft.println(timeBlock[valuePos - i]);
+    }
+  }
+
+  valuePos++;
+}
+
+void graph1()
+{
+  ecg = analogRead(A8)/6;
+ if(ecg>100)
+ {
+  ecg=100;
+  }
+  timeBlock[valuePos] = ((millis() - 4500) / 1000);
+
+  valueBlock[valuePos] = ecg;
+  
+  if(proDebug)
+  {
+    Serial.println(timeBlock[valuePos]);
+  }
+  
+  if(blockPos < 8)
+  {
+    // print the time
+    tft.setCursor((mark[valuePos] - 5), (originY + 16));
+    tft.setTextColor(graphColor, WHITE);
+    tft.setTextSize(1);
+   //  tft.print(" ");
+   // tft.println(timeBlock[valuePos]);
+    
+    // map the value
+    locationBlock[valuePos] = map(ecg, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point
+    tft.fillRect((mark[valuePos] - 1), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // try connecting to previous point
+    if(valuePos != 0)
+    {
+      tft.drawLine(mark[valuePos], locationBlock[valuePos], mark[(valuePos - 1)], locationBlock[(valuePos - 1)], lineColor);
+    }
+
+    blockPos++;
+  }
+  else
+  {
+    // clear the graph's canvas
+    tft.fillRect((originX + 2), (originY - sizeY), sizeX, sizeY, WHITE);
+
+    // map the value - current point
+    locationBlock[valuePos] = map(ecg, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point - current point
+    tft.fillRect((mark[7]), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // draw all points
+    for(int i = 0; i < 8; i++)
+    {
+      tft.fillRect((mark[(blockPos - (i + 1))] - 1), (locationBlock[(valuePos - i)] - 1), markSize, markSize, pointColor);
+    }
+
+    // draw all the lines
+    for(int i = 0; i < 7; i++)
+    {
+      tft.drawLine(mark[blockPos - (i + 1)], locationBlock[valuePos - i], mark[blockPos - (i + 2)], locationBlock[valuePos - (i + 1)], lineColor);
+    }
+    
+    // change time lables
+    for(int i = 0; i <= 7; i++)
+    {
+      tft.setCursor((mark[(7 - i)] - 5), (originY + 16));
+      tft.setTextColor(graphColor, WHITE);
+      tft.setTextSize(1);
+     // tft.print(" ");
+     // tft.println(timeBlock[valuePos - i]);
+    }
+  }
+
+  valuePos++;
+}
+
+
+void graph2()
+{
+  emg = analogRead(A9)/4;
+ if(emg>100)
+ {
+  emg=100;
+  }
+  timeBlock[valuePos] = ((millis() - 4500) / 1000);
+
+  valueBlock[valuePos] = emg;
+  
+  if(proDebug)
+  {
+    Serial.println(timeBlock[valuePos]);
+  }
+  
+  if(blockPos < 8)
+  {
+    // print the time
+    tft.setCursor((mark[valuePos] - 5), (originY + 16));
+    tft.setTextColor(graphColor, WHITE);
+    tft.setTextSize(1);
+   //  tft.print(" ");
+   // tft.println(timeBlock[valuePos]);
+    
+    // map the value
+    locationBlock[valuePos] = map(emg, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point
+    tft.fillRect((mark[valuePos] - 1), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // try connecting to previous point
+    if(valuePos != 0)
+    {
+      tft.drawLine(mark[valuePos], locationBlock[valuePos], mark[(valuePos - 1)], locationBlock[(valuePos - 1)], lineColor);
+    }
+
+    blockPos++;
+  }
+  else
+  {
+    // clear the graph's canvas
+    tft.fillRect((originX + 2), (originY - sizeY), sizeX, sizeY, WHITE);
+
+    // map the value - current point
+    locationBlock[valuePos] = map(emg, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point - current point
+    tft.fillRect((mark[7]), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // draw all points
+    for(int i = 0; i < 8; i++)
+    {
+      tft.fillRect((mark[(blockPos - (i + 1))] - 1), (locationBlock[(valuePos - i)] - 1), markSize, markSize, pointColor);
+    }
+
+    // draw all the lines
+    for(int i = 0; i < 7; i++)
+    {
+      tft.drawLine(mark[blockPos - (i + 1)], locationBlock[valuePos - i], mark[blockPos - (i + 2)], locationBlock[valuePos - (i + 1)], lineColor);
+    }
+    
+    // change time lables
+    for(int i = 0; i <= 7; i++)
+    {
+      tft.setCursor((mark[(7 - i)] - 5), (originY + 16));
+      tft.setTextColor(graphColor, WHITE);
+      tft.setTextSize(1);
+     // tft.print(" ");
+     // tft.println(timeBlock[valuePos - i]);
+    }
+  }
+
+  valuePos++;
+}
+
+void graph3()
+{
+  sd = analogRead(A10)/2;
+ if(sd>100)
+ {
+  sd=100;
+  }
+  timeBlock[valuePos] = ((millis() - 4500) / 1000);
+
+  valueBlock[valuePos] = sd;
+  
+  if(proDebug)
+  {
+    Serial.println(timeBlock[valuePos]);
+  }
+  
+  if(blockPos < 8)
+  {
+    // print the time
+    tft.setCursor((mark[valuePos] - 5), (originY + 16));
+    tft.setTextColor(graphColor, WHITE);
+    tft.setTextSize(1);
+   //  tft.print(" ");
+   // tft.println(timeBlock[valuePos]);
+    
+    // map the value
+    locationBlock[valuePos] = map(sd, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point
+    tft.fillRect((mark[valuePos] - 1), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // try connecting to previous point
+    if(valuePos != 0)
+    {
+      tft.drawLine(mark[valuePos], locationBlock[valuePos], mark[(valuePos - 1)], locationBlock[(valuePos - 1)], lineColor);
+    }
+
+    blockPos++;
+  }
+  else
+  {
+    // clear the graph's canvas
+    tft.fillRect((originX + 2), (originY - sizeY), sizeX, sizeY, WHITE);
+
+    // map the value - current point
+    locationBlock[valuePos] = map(sd, 0, graphRange, originY, (originY - sizeY));
+
+    // draw point - current point
+    tft.fillRect((mark[7]), (locationBlock[valuePos] - 1), markSize, markSize, pointColor);
+
+    // draw all points
+    for(int i = 0; i < 8; i++)
+    {
+      tft.fillRect((mark[(blockPos - (i + 1))] - 1), (locationBlock[(valuePos - i)] - 1), markSize, markSize, pointColor);
+    }
+
+    // draw all the lines
+    for(int i = 0; i < 7; i++)
+    {
+      tft.drawLine(mark[blockPos - (i + 1)], locationBlock[valuePos - i], mark[blockPos - (i + 2)], locationBlock[valuePos - (i + 1)], lineColor);
+    }
+    
+    // change time lables
+    for(int i = 0; i <= 7; i++)
+    {
+      tft.setCursor((mark[(7 - i)] - 5), (originY + 16));
+      tft.setTextColor(graphColor, WHITE);
+      tft.setTextSize(1);
+     // tft.print(" ");
+     // tft.println(timeBlock[valuePos - i]);
+    }
+  }
+
+  valuePos++;
+}
+void hb()
+  {
+  count1=0;
+  for(int i=0;i<3000;i++)
+  {
+    if(digitalRead(A11)==HIGH && flag==0)
+    {
+      count1+=1;
+      flag=1;
+    }
+  if(digitalRead(A11)==LOW)
+      flag=0; 
+  delay(1);
+  }
+
+  btrate=count1*15;
+  if(btrate>110)
+  btrate=110;
+}
+
+void hb1()
+  {
+  count1=0;
+  for(int i=0;i<3000;i++)
+  {
+    if(digitalRead(A11)==HIGH && flag==0)
+    {
+      count1+=1;
+      flag=1;
+    }
+  if(digitalRead(A11)==LOW)
+      flag=0; 
+  delay(1);
+  }
+
+  btrate=count1*15;
+if(btrate>110)
+  btrate=110;
+}
+    
 
